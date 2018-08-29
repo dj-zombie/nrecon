@@ -69,6 +69,7 @@ puts "+====================================================".light_cyan
 puts "| Finding hosts...                         ".light_cyan
 `nmap -sP -n -T4 #{ range } -oG log/nhosts-#{ timestamp }`
 hosts = IO.readlines("log/nhosts-#{ timestamp }").map {|l| l.split(" ")[1].delete('Nmap') }.reject(&:empty?)
+hosts.reject! { |h| h.include?("#{ ip.join('.') }") }
 IO.write("log/hosts-#{ timestamp }", hosts.join("\n"))
 puts "| Hosts:                                   ".light_cyan
 hosts.each { |h| puts "|  🎯 #{ h } ✔".green }
