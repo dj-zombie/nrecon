@@ -38,9 +38,11 @@ if ARGV.include?('-h')
   exit
 end
 
+log = '/root/git/nrecon/log'
+
 puts 'Cleaning logs... '.green if ARGV.include?('-c') || ARGV.include?('-cq')
-`rm log/*` if ARGV.include?('-c')
-`rm log/*` && exit if ARGV.include?('-cq')
+`rm #{ log }/*` if ARGV.include?('-c')
+`rm #{ log }/*` && exit if ARGV.include?('-cq')
 
 puts "OPTIONS: ".green
 puts '- Disable SMB Brute Force'.blue if ARGV.include?('-nb')
@@ -67,10 +69,10 @@ puts "=[ ✔ DONE ]==========================================".light_cyan
 # Find local hosts
 puts "+====================================================".light_cyan
 puts "| Finding hosts...                         ".light_cyan
-`nmap -sP -n -T4 #{ range } -oG log/nhosts-#{ timestamp }`
-hosts = IO.readlines("log/nhosts-#{ timestamp }").map {|l| l.split(" ")[1].delete('Nmap') }.reject(&:empty?)
+`nmap -sn #{ range } -oG #{ log }/nhosts-#{ timestamp }`
+hosts = IO.readlines("#{ log }/nhosts-#{ timestamp }").map {|l| l.split(" ")[1].delete('Nmap') }.reject(&:empty?)
 hosts.reject! { |h| h.include?("#{ ip.join('.') }") }
-IO.write("log/hosts-#{ timestamp }", hosts.join("\n"))
+IO.write("#{ log }/hosts-#{ timestamp }", hosts.join("\n"))
 puts "| Hosts:                                   ".light_cyan
 hosts.each { |h| puts "|  🎯 #{ h } ✔".green }
 puts "|=[ ✔ DONE ]=========================================".light_cyan
@@ -78,66 +80,67 @@ puts "|=[ ✔ DONE ]=========================================".light_cyan
 # Nmap quick scan
 puts "+====================================================".light_cyan
 puts "| Starting nmap scans...".light_cyan
-nscan = `nmap -T4 -F -oX log/nscan-#{ timestamp }.xml -iL log/hosts-#{ timestamp }`
-puts "|  - Saved to log/nscan-#{ timestamp }.xml".green
+# nscan = `nmap -p 1-65535 -sV --version-intensity 5 -A -O -sS -oN #{ log }/nscan-#{ timestamp }.txt -iL #{ log }/hosts-#{ timestamp }`
+nscan = `nmap -sV --version-intensity 5 -A -O -oN #{ log }/nscan-#{ timestamp }.txt -iL #{ log }/hosts-#{ timestamp }`
+puts "|  - Saved to #{ log }/nscan-#{ timestamp }.txt".green
 
 # SMB Shares
 puts "| Finding SMB shares...".light_cyan
-`nmap -Pn -T4 --script smb-enum-shares -p445 -oX log/smbshares-#{ timestamp }.xml -iL log/hosts-#{ timestamp }`
-puts "|  - Saved to log/smbshares-#{ timestamp }.xml".green
+`nmap -Pn -T4 --script smb-enum-shares -p445 -oN #{ log }/smbshares-#{ timestamp }.txt -iL #{ log }/hosts-#{ timestamp }`
+puts "|  - Saved to #{ log }/smbshares-#{ timestamp }.txt".green
 puts "+====================================================".light_cyan
 
 # SMB Brute login
 unless ARGV.include?('-nb')
   puts "| Brute forcing SMB shares...".light_cyan
-  `nmap -sV -T4 --script smb-brute -p445 -oX log/smbbrute-#{ timestamp }.xml -iL log/hosts-#{ timestamp }`
-puts "|  - Saved to log/smbbrute-#{ timestamp }.xml".green
+  `nmap -sV -T4 --script smb-brute -p445 -oN #{ log }/smbbrute-#{ timestamp }.txt -iL #{ log }/hosts-#{ timestamp }`
+puts "|  - Saved to #{ log }/smbbrute-#{ timestamp }.txt".green
 end
 
 # SMB Users
 puts "| Finding SMB users...".light_cyan
-`nmap -Pn -T4 -sU -sS --script smb-enum-users -p U:137,T:139 -oX log/smbusers-#{ timestamp }.xml -iL log/hosts-#{ timestamp }`
-puts "|  - Saved to log/smbusers-#{ timestamp }.xml".green
+`nmap -Pn -T4 -sU -sS --script smb-enum-users -p U:137,T:139 -oN #{ log }/smbusers-#{ timestamp }.txt -iL #{ log }/hosts-#{ timestamp }`
+puts "|  - Saved to #{ log }/smbusers-#{ timestamp }.txt".green
 
 # NFS Shares
 puts "| Finding NFS shares...".light_cyan
-`nmap -Pn -sV -T4 --script afp-showmount -p111 -oX log/nfs-#{ timestamp }.xml -iL log/hosts-#{ timestamp }`
-puts "|  - Saved to log/nfs-#{ timestamp }.xml".green
+`nmap -Pn -sV -T4 --script afp-showmount -p111 -oN #{ log }/nfs-#{ timestamp }.txt -iL #{ log }/hosts-#{ timestamp }`
+puts "|  - Saved to #{ log }/nfs-#{ timestamp }.txt".green
 puts "|=[ ✔ DONE ]=========================================".light_cyan
 
 # Nmap Vulnerability scanner
 unless ARGV.include?('-nv')
   puts "+====================================================".light_cyan
   puts "| Nmap Vulnerability scanner...".light_cyan
-  `nmap -sV --script=vulscan/vulscan.nse -oX log/vuln-#{ timestamp }.xml -iL log/hosts-#{ timestamp }`
-  puts "|  - Saved to log/smbusers-#{ timestamp }.xml".green
+  `nmap -sV --script=vulscan/vulscan.nse -oN #{ log }/vuln-#{ timestamp }.txt -iL #{ log }/hosts-#{ timestamp }`
+  puts "|  - Saved to #{ log }/smbusers-#{ timestamp }.txt".green
 end
 
-# Full scan
-unless ARGV.include?('-nf')
-  puts "| Starting full nmap scan...".light_cyan
-  `nmap -sU -T4 -A -v -oX log/full-#{ timestamp }.xml -iL log/hosts-#{ timestamp }`
-  puts "|  - Saved to log/full-#{ timestamp }.xml".green
-end
 
 # Bettercap sniffing
 puts "+====================================================".light_cyan
 puts "| Sniffing web traffic...".light_cyan
-becap_proc = IO.popen("bettercap -I #{ iface } -XL -O log/bcap-#{ timestamp }", 'w')
+becap_proc = IO.popen("bettercap -I #{ iface } -XL -O #{ log }/bcap-#{ timestamp }", 'w')
 bcap_pid = becap_proc.pid
 
 # Responder
 puts "+====================================================".light_cyan
 puts "| Starting Responder...".light_cyan
-resp_proc = IO.popen("responder -I #{ iface } > log/responder-#{ timestamp }", 'w')
+resp_proc = IO.popen("responder -I #{ iface } > #{ log }/responder-#{ timestamp }", 'w')
 resp_pid = resp_proc.pid
 
 # TCPdump
 puts "+====================================================".light_cyan
 puts "| Starting tcpdump...".light_cyan
-resp_proc = IO.popen("tcpdump -i #{ iface } -w log/tcpdump-#{ timestamp }", 'w')
+resp_proc = IO.popen("tcpdump -i #{ iface } -w #{ log }/tcpdump-#{ timestamp }", 'w')
 resp_pid = resp_proc.pid
 
+# Full scan
+unless ARGV.include?('-nf')
+  puts "| Starting full nmap scan...".light_cyan
+  `nmap -sU -T4 -oN #{ log }/full-#{ timestamp }.txt -iL #{ log }/hosts-#{ timestamp }`
+  puts "|  - Saved to #{ log }/full-#{ timestamp }.txt".green
+end
 
 # Kill processes
 sleep 10 * minitues_until_quit
