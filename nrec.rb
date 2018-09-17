@@ -20,10 +20,12 @@ puts <<-'EOF'
 EOF
 
 # Arguments
-if ARGV.include?('-h')
+if ARGV.include?('-h') || ARGV.empty?
   puts <<-'EOF'
 
   ---------------------------------------------------------
+  USSAGE: nrec.rb [FLAGS] [TARGET]
+   
    FLAGS
 
      -nb  Disable SMB Brute Force.
@@ -31,14 +33,15 @@ if ARGV.include?('-h')
      -nf  Disable full nmap scan.
      -c   Clean logs.
      -cq  Clean logs & quit.
+
+    TARGET
+      a target name, usually ssid to store log files
   
   ---------------------------------------------------------
 
   EOF
   exit
 end
-
-log = '/root/git/nrecon/log'
 
 puts 'Cleaning logs... '.green if ARGV.include?('-c') || ARGV.include?('-cq')
 `rm #{ log }/*` if ARGV.include?('-c')
@@ -54,6 +57,9 @@ puts '- Disable full nmap scan.'.blue if ARGV.include?('-nf')
 minitues_until_quit = 60
 timestamp = DateTime.now
 iface = 'wlan0'
+target = ARGV.last
+log = '/root/git/nrecon/log/' + target
+`mkdir -p #{ log }`
 
 
 # Get IP and subnet to attack
